@@ -1,3 +1,5 @@
+mod post_processing;
+
 use avian2d::{prelude as avian, prelude::*};
 use bevy::input::keyboard::KeyCode;
 use bevy::prelude::*;
@@ -6,6 +8,7 @@ use bevy_scriptum::runtimes::rhai::prelude::*;
 use bevy_scriptum::{prelude::*, ScriptingRuntimeBuilder};
 use bevy_tnua::{builtins::TnuaBuiltinCrouch, prelude::*};
 use bevy_tnua_avian2d::*;
+use post_processing::{PostProcessPlugin, PostProcessSettings};
 use rhai::ImmutableString;
 
 #[derive(Component)]
@@ -62,6 +65,7 @@ fn main() {
         .add_plugins(PhysicsDebugPlugin::default())
         .add_plugins(TnuaAvian2dPlugin::default())
         .add_plugins(TnuaControllerPlugin::default())
+        .add_plugins(PostProcessPlugin)
         .add_plugins(EditorPlugin::default())
         .add_scripting::<RhaiRuntime>(setup_rhai)
         .add_systems(Startup, setup_camera_and_lights)
@@ -80,24 +84,32 @@ fn reset_jump_queued(mut query: Query<&mut JumpQueued>) {
 }
 
 fn setup_camera_and_lights(mut commands: Commands) {
-    commands.spawn(Camera2dBundle {
-        transform: Transform::from_xyz(0.0, 14.0, 30.0)
-            .with_scale((0.05 * Vec2::ONE).extend(1.0))
-            .looking_at(Vec3::new(0.0, 14.0, 0.0), Vec3::Y),
-        ..Default::default()
-    });
+    commands.spawn((
+        Camera2dBundle {
+            transform: Transform::from_xyz(0.0, 14.0, 30.0)
+                .with_scale((0.05 * Vec2::ONE).extend(1.0))
+                .looking_at(Vec3::new(0.0, 14.0, 0.0), Vec3::Y),
+            ..Default::default()
+        },
+        PostProcessSettings {
+            pixel_size: 512.,     // Smaller value for less pixelation
+            edge_threshold: 0.5,  // Higher value for less pronounced edges
+            color_depth: 16.0,    // Higher value for more colors
+            effect_strength: 1.0, // Adjust this to blend with the original image
+        },
+    ));
 }
 
 fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         avian::RigidBody::Dynamic,
-        avian::Collider::capsule(0.5, 1.0),
+        avian::Collider::capsule(1.0, 2.0),
         TnuaControllerBundle::default(),
         CharacterMotionConfig {
             speed: 30.0,
             acceleration: 50.0,
             jump_height: 12.0,
-            float_height: 1.1,
+            float_height: 2.1,
             crouch_float_offset: -0.9,
         },
         TnuaAvian2dSensorShape(avian::Collider::rectangle(1.0, 0.0)),
@@ -109,7 +121,7 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
                     blue: 1.0,
                     alpha: 1.0,
                 }),
-                custom_size: Some(Vec2::new(1.0, 2.0)),
+                custom_size: Some(Vec2::new(2.0, 4.0)),
                 ..default()
             },
             ..default()
@@ -133,14 +145,14 @@ fn setup_level(mut commands: Commands) {
                     blue: 0.3,
                     alpha: 1.0,
                 }),
-                custom_size: Some(Vec2::new(20.0, 1.0)),
+                custom_size: Some(Vec2::new(20.0, 5.0)),
                 ..default()
             },
             transform: Transform::from_xyz(0.0, -2.0, 0.0),
             ..default()
         },
         avian::RigidBody::Static,
-        avian::Collider::rectangle(20.0, 1.0),
+        avian::Collider::rectangle(20.0, 5.0),
     ));
 
     // Floating platform
@@ -153,14 +165,14 @@ fn setup_level(mut commands: Commands) {
                     blue: 0.5,
                     alpha: 1.0,
                 }),
-                custom_size: Some(Vec2::new(8.0, 0.5)),
+                custom_size: Some(Vec2::new(8.0, 5.)),
                 ..default()
             },
             transform: Transform::from_xyz(10.0, 5.0, 0.0),
             ..default()
         },
         avian::RigidBody::Static,
-        avian::Collider::rectangle(8.0, 0.5),
+        avian::Collider::rectangle(8.0, 5.),
     ));
 
     // Sloped platform
@@ -173,7 +185,7 @@ fn setup_level(mut commands: Commands) {
                     blue: 0.4,
                     alpha: 1.0,
                 }),
-                custom_size: Some(Vec2::new(10.0, 0.5)),
+                custom_size: Some(Vec2::new(10.0, 5.)),
                 ..default()
             },
             transform: Transform::from_xyz(-10.0, 2.0, 0.0)
@@ -181,7 +193,7 @@ fn setup_level(mut commands: Commands) {
             ..default()
         },
         avian::RigidBody::Static,
-        avian::Collider::rectangle(10.0, 0.5),
+        avian::Collider::rectangle(10.0, 5.),
     ));
 
     // Small floating platform
@@ -194,14 +206,14 @@ fn setup_level(mut commands: Commands) {
                     blue: 0.6,
                     alpha: 1.0,
                 }),
-                custom_size: Some(Vec2::new(4.0, 0.5)),
+                custom_size: Some(Vec2::new(4.0, 5.)),
                 ..default()
             },
             transform: Transform::from_xyz(-5.0, 8.0, 0.0),
             ..default()
         },
         avian::RigidBody::Static,
-        avian::Collider::rectangle(4.0, 0.5),
+        avian::Collider::rectangle(4.0, 5.),
     ));
 }
 
