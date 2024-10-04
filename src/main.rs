@@ -94,9 +94,10 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         avian::Collider::capsule(0.5, 1.0),
         TnuaControllerBundle::default(),
         CharacterMotionConfig {
-            speed: 40.0,
-            jump_height: 4.0,
-            float_height: 2.0,
+            speed: 30.0,
+            acceleration: 50.0,
+            jump_height: 12.0,
+            float_height: 1.1,
             crouch_float_offset: -0.9,
         },
         TnuaAvian2dSensorShape(avian::Collider::rectangle(1.0, 0.0)),
@@ -116,10 +117,13 @@ fn setup_player(mut commands: Commands, asset_server: Res<AssetServer>) {
         Script::<RhaiScript>::new(asset_server.load("scripts/game_logic.rhai")),
         DesiredVelocity(Vec3::ZERO),
         JumpQueued(false),
+        GravityScale(4.0),
+        LockedAxes::ROTATION_LOCKED,
     ));
 }
 
 fn setup_level(mut commands: Commands) {
+    // Ground platform
     commands.spawn((
         SpriteBundle {
             sprite: Sprite {
@@ -138,11 +142,73 @@ fn setup_level(mut commands: Commands) {
         avian::RigidBody::Static,
         avian::Collider::rectangle(20.0, 1.0),
     ));
+
+    // Floating platform
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                color: Color::Srgba(Srgba {
+                    red: 0.5,
+                    green: 0.5,
+                    blue: 0.5,
+                    alpha: 1.0,
+                }),
+                custom_size: Some(Vec2::new(8.0, 0.5)),
+                ..default()
+            },
+            transform: Transform::from_xyz(10.0, 5.0, 0.0),
+            ..default()
+        },
+        avian::RigidBody::Static,
+        avian::Collider::rectangle(8.0, 0.5),
+    ));
+
+    // Sloped platform
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                color: Color::Srgba(Srgba {
+                    red: 0.4,
+                    green: 0.4,
+                    blue: 0.4,
+                    alpha: 1.0,
+                }),
+                custom_size: Some(Vec2::new(10.0, 0.5)),
+                ..default()
+            },
+            transform: Transform::from_xyz(-10.0, 2.0, 0.0)
+                .with_rotation(Quat::from_rotation_z(0.3)),
+            ..default()
+        },
+        avian::RigidBody::Static,
+        avian::Collider::rectangle(10.0, 0.5),
+    ));
+
+    // Small floating platform
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                color: Color::Srgba(Srgba {
+                    red: 0.6,
+                    green: 0.6,
+                    blue: 0.6,
+                    alpha: 1.0,
+                }),
+                custom_size: Some(Vec2::new(4.0, 0.5)),
+                ..default()
+            },
+            transform: Transform::from_xyz(-5.0, 8.0, 0.0),
+            ..default()
+        },
+        avian::RigidBody::Static,
+        avian::Collider::rectangle(4.0, 0.5),
+    ));
 }
 
 #[derive(Component)]
 struct CharacterMotionConfig {
     speed: f32,
+    acceleration: f32,
     jump_height: f32,
     float_height: f32,
     crouch_float_offset: f32,
@@ -175,6 +241,9 @@ fn apply_platformer_controls(
         controller.basis(TnuaBuiltinWalk {
             // Move in the direction the player entered, at a speed of 10.0:
             desired_velocity: desired_velocity * config.speed,
+            acceleration: config.acceleration,
+            air_acceleration: config.acceleration / 2.0,
+            free_fall_extra_gravity: 2.0,
 
             // Turn the character in the movement direction:
             desired_forward: desired_velocity,
@@ -187,7 +256,7 @@ fn apply_platformer_controls(
             ..Default::default()
         });
 
-        if jump_queued.0 {
+        if keyboard_input.pressed(KeyCode::Space) {
             controller.action(TnuaBuiltinJump {
                 height: config.jump_height,
                 ..default()
